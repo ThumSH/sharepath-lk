@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { BarChartCard } from '@/components/charts/BarChartCard';
+import { ChartRangeSelector } from '@/components/charts/ChartRangeSelector';
+import { LineChartCard } from '@/components/charts/LineChartCard';
 import { SavedAnnouncementCard } from '@/components/cards/SavedAnnouncementCard';
 import { AppScreen } from '@/components/layout/AppScreen';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -10,16 +13,31 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { Pill } from '@/components/ui/Pill';
 import { StatCard } from '@/components/ui/StatCard';
 import { currencies } from '@/data/currencies';
+import { marketIndexHistory, sectorSummaries } from '@/data/history';
 import { announcements, marketSummary } from '@/data/market';
 import { useAsyncData } from '@/hooks/useAsyncData';
-import { spacing } from '@/lib/constants';
+import { colors, spacing } from '@/lib/constants';
+import { getMarketIndexHistory, getSectorSummaries } from '@/services/marketDataService';
 import { getCurrencyRates, getLatestMarketSummary, getOfficialUpdates } from '@/services/sharepathData';
+import type { ChartRange } from '@/types/history';
 
 const sections = ['Stock Market', 'Currency', 'Official Updates'];
 
 export default function MarketScreen() {
   const [section, setSection] = useState(sections[0]);
+  const [chartRange, setChartRange] = useState<ChartRange>('1Y');
   const marketState = useAsyncData(getLatestMarketSummary, marketSummary, []);
+  const aspiState = useAsyncData(
+    () => getMarketIndexHistory('ASPI', chartRange),
+    marketIndexHistory.filter((item) => item.indexCode === 'ASPI'),
+    [chartRange]
+  );
+  const spSl20State = useAsyncData(
+    () => getMarketIndexHistory('SPSL20', chartRange),
+    marketIndexHistory.filter((item) => item.indexCode === 'SPSL20'),
+    [chartRange]
+  );
+  const sectorState = useAsyncData(getSectorSummaries, sectorSummaries, []);
   const currencyState = useAsyncData(getCurrencyRates, currencies, []);
   const updatesState = useAsyncData(
     getOfficialUpdates,
@@ -31,8 +49,20 @@ export default function MarketScreen() {
     })),
     []
   );
-  const isLoading = marketState.isLoading || currencyState.isLoading || updatesState.isLoading;
-  const isFallback = marketState.isFallback || currencyState.isFallback || updatesState.isFallback;
+  const isLoading =
+    marketState.isLoading ||
+    aspiState.isLoading ||
+    spSl20State.isLoading ||
+    sectorState.isLoading ||
+    currencyState.isLoading ||
+    updatesState.isLoading;
+  const isFallback =
+    marketState.isFallback ||
+    aspiState.isFallback ||
+    spSl20State.isFallback ||
+    sectorState.isFallback ||
+    currencyState.isFallback ||
+    updatesState.isFallback;
 
   return (
     <AppScreen bottomInset={88}>
@@ -47,14 +77,42 @@ export default function MarketScreen() {
       </View>
 
       {section === 'Stock Market' ? (
-        <View style={styles.grid}>
-          <StatCard label="ASPI" value={marketState.data.aspi} />
-          <StatCard label="S&P SL20" value={marketState.data.spSL20} />
-          <StatCard label="Turnover" value={marketState.data.turnover} />
-          <StatCard label="Top gainer" value={marketState.data.topGainer} />
-          <StatCard label="Top loser" value={marketState.data.topLoser} />
-          <StatCard label="Most traded" value={marketState.data.mostTraded} />
-        </View>
+        <>
+          <View style={styles.grid}>
+            <StatCard label="ASPI" value={marketState.data.aspi} />
+            <StatCard label="S&P SL20" value={marketState.data.spSL20} />
+            <StatCard label="Turnover" value={marketState.data.turnover} />
+            <StatCard label="Top gainer" value={marketState.data.topGainer} />
+            <StatCard label="Top loser" value={marketState.data.topLoser} />
+            <StatCard label="Most traded" value={marketState.data.mostTraded} />
+          </View>
+          <ChartRangeSelector value={chartRange} onChange={setChartRange} />
+          <LineChartCard
+            title="ASPI History"
+            subtitle="Historical index closes for market context."
+            data={aspiState.data.map((item) => ({ label: item.tradeDate.slice(5), value: item.closeValue }))}
+            sourceLabel={aspiState.data[0]?.sourceLabel ?? 'Sample data'}
+            isLoading={aspiState.isLoading}
+          />
+          <LineChartCard
+            title="S&P SL20 History"
+            subtitle="Historical index closes for large, liquid share context."
+            data={spSl20State.data.map((item) => ({ label: item.tradeDate.slice(5), value: item.closeValue }))}
+            sourceLabel={spSl20State.data[0]?.sourceLabel ?? 'Sample data'}
+            isLoading={spSl20State.isLoading}
+          />
+          <BarChartCard
+            title="Sector Comparison"
+            subtitle="Turnover by sector in sample structured data."
+            data={sectorState.data.map((item) => ({
+              label: item.sectorName,
+              value: item.turnover ?? 0,
+              frontColor: (item.changePercent ?? 0) >= 0 ? colors.accent : colors.warning,
+            }))}
+            sourceLabel={sectorState.data[0]?.sourceLabel ?? 'Sample data'}
+            isLoading={sectorState.isLoading}
+          />
+        </>
       ) : null}
 
       {section === 'Currency' ? (
@@ -67,6 +125,7 @@ export default function MarketScreen() {
           <InfoBox tone="green">
             Currency changes can affect companies differently depending on imports, exports, foreign loans, and foreign income.
           </InfoBox>
+          <InfoBox>Currency history charts will be added after CBSL data sync is connected.</InfoBox>
         </>
       ) : null}
 

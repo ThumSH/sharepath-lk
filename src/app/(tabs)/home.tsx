@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { LineChartCard } from '@/components/charts/LineChartCard';
 import { CompanyCard } from '@/components/cards/CompanyCard';
 import { LessonCard } from '@/components/cards/LessonCard';
 import { SavedAnnouncementCard } from '@/components/cards/SavedAnnouncementCard';
@@ -14,12 +15,14 @@ import { SectionHeader } from '@/components/ui/SectionHeader';
 import { StatCard } from '@/components/ui/StatCard';
 import { companies } from '@/data/companies';
 import { currencies } from '@/data/currencies';
+import { companyPriceHistory, marketIndexHistory } from '@/data/history';
 import { lessons } from '@/data/lessons';
 import { marketSummary } from '@/data/market';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useAuth } from '@/hooks/useAuth';
 import { advisoryDisclaimer, colors, radii, spacing, typography } from '@/lib/constants';
 import { routes } from '@/lib/routes';
+import { getCompanyPriceHistory, getMarketIndexHistory } from '@/services/marketDataService';
 import {
   getCompanies,
   getCurrencyRates,
@@ -37,17 +40,31 @@ export default function HomeScreen() {
   const currencyState = useAsyncData(getCurrencyRates, currencies, []);
   const updatesState = useAsyncData(getOfficialUpdates, [], []);
   const featuredCompany = companiesState.data[0] ?? companies[0];
+  const aspiHistoryState = useAsyncData(
+    () => getMarketIndexHistory('ASPI', '6M'),
+    marketIndexHistory.filter((item) => item.indexCode === 'ASPI'),
+    []
+  );
+  const featuredPriceState = useAsyncData(
+    () => getCompanyPriceHistory(featuredCompany.symbol, '6M'),
+    companyPriceHistory.filter((item) => item.companySymbol === featuredCompany.symbol),
+    [featuredCompany.symbol]
+  );
   const lesson = lessonsState.data[0] ?? lessons[0];
   const isLoading =
     companiesState.isLoading ||
     lessonsState.isLoading ||
     marketState.isLoading ||
+    aspiHistoryState.isLoading ||
+    featuredPriceState.isLoading ||
     currencyState.isLoading ||
     updatesState.isLoading;
   const isFallback =
     companiesState.isFallback ||
     lessonsState.isFallback ||
     marketState.isFallback ||
+    aspiHistoryState.isFallback ||
+    featuredPriceState.isFallback ||
     currencyState.isFallback ||
     updatesState.isFallback;
 
@@ -85,6 +102,13 @@ export default function HomeScreen() {
         <StatCard label="Turnover" value={marketState.data.turnover} />
         <StatCard label="Traded companies" value={`${marketState.data.tradedCompanies}`} />
       </View>
+      <LineChartCard
+        title="ASPI Mini Trend"
+        subtitle="Compact historical preview."
+        data={aspiHistoryState.data.map((item) => ({ label: item.tradeDate.slice(5), value: item.closeValue }))}
+        sourceLabel={aspiHistoryState.data[0]?.sourceLabel ?? 'Sample data'}
+        isLoading={aspiHistoryState.isLoading}
+      />
 
       <SectionHeader title="Currency Watch" />
       <View style={styles.grid}>
@@ -101,6 +125,13 @@ export default function HomeScreen() {
       </PrimaryButton>
 
       <SectionHeader title="Company to Understand" />
+      <LineChartCard
+        title={`${featuredCompany.symbol} Price Preview`}
+        subtitle="Historical closing prices for learning context."
+        data={featuredPriceState.data.map((item) => ({ label: item.tradeDate.slice(5), value: item.closePrice }))}
+        sourceLabel={featuredPriceState.data[0]?.sourceLabel ?? 'Sample data'}
+        isLoading={featuredPriceState.isLoading}
+      />
       <CompanyCard
         company={featuredCompany}
         onPress={() => router.push(routes.company(featuredCompany.symbol))}

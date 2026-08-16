@@ -14,6 +14,20 @@ import type {
   OfficialUpdate,
   OfficialUpdateDbRow,
 } from '@/types/market';
+import type {
+  CompanyDividendHistoryDbRow,
+  CompanyDividendHistoryPoint,
+  CompanyFactorSnapshot,
+  CompanyFactorSnapshotDbRow,
+  CompanyFinancialHistoryDbRow,
+  CompanyFinancialHistoryPoint,
+  CompanyPriceHistoryDbRow,
+  CompanyPriceHistoryPoint,
+  MarketIndexHistoryDbRow,
+  MarketIndexHistoryPoint,
+  SectorSummary,
+  SectorSummaryDbRow,
+} from '@/types/history';
 
 function toNumber(value: number | string | null | undefined) {
   if (typeof value === 'number') {
@@ -112,5 +126,98 @@ export function mapCompanyAnnouncementFromDb(announcement: CompanyAnnouncementDb
     publishedDate: announcement.published_date ?? undefined,
     summary: announcement.summary ?? 'Official update summary is not available yet.',
     sourceLabel: announcement.source_label ?? 'Sample data',
+  };
+}
+
+function optionalNumber(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === '') {
+    return undefined;
+  }
+
+  return toNumber(value);
+}
+
+export function mapCompanyPriceHistoryFromDb(row: CompanyPriceHistoryDbRow): CompanyPriceHistoryPoint {
+  return {
+    id: row.id,
+    companySymbol: row.company_symbol,
+    tradeDate: row.trade_date,
+    openPrice: optionalNumber(row.open_price),
+    highPrice: optionalNumber(row.high_price),
+    lowPrice: optionalNumber(row.low_price),
+    closePrice: toNumber(row.close_price),
+    volume: optionalNumber(row.volume),
+    turnover: optionalNumber(row.turnover),
+    sourceLabel: row.source_label ?? 'Sample data',
+  };
+}
+
+export function mapCompanyFinancialHistoryFromDb(row: CompanyFinancialHistoryDbRow): CompanyFinancialHistoryPoint {
+  return {
+    id: row.id,
+    companySymbol: row.company_symbol,
+    financialYear: row.financial_year,
+    revenue: optionalNumber(row.revenue),
+    profitAfterTax: optionalNumber(row.profit_after_tax),
+    eps: optionalNumber(row.eps),
+    navPerShare: optionalNumber(row.nav_per_share),
+    totalAssets: optionalNumber(row.total_assets),
+    totalLiabilities: optionalNumber(row.total_liabilities),
+    sourceLabel: row.source_label ?? 'Sample data',
+  };
+}
+
+export function mapCompanyDividendHistoryFromDb(row: CompanyDividendHistoryDbRow): CompanyDividendHistoryPoint {
+  return {
+    id: row.id,
+    companySymbol: row.company_symbol,
+    dividendYear: row.dividend_year,
+    dividendPerShare: optionalNumber(row.dividend_per_share),
+    dividendType: row.dividend_type ?? undefined,
+    sourceLabel: row.source_label ?? 'Sample data',
+  };
+}
+
+export function mapMarketIndexHistoryFromDb(row: MarketIndexHistoryDbRow): MarketIndexHistoryPoint {
+  return {
+    id: row.id,
+    indexCode: row.index_code,
+    tradeDate: row.trade_date,
+    closeValue: toNumber(row.close_value),
+    changeValue: optionalNumber(row.change_value),
+    changePercent: optionalNumber(row.change_percent),
+    sourceLabel: row.source_label ?? 'Sample data',
+  };
+}
+
+export function mapSectorSummaryFromDb(row: SectorSummaryDbRow): SectorSummary {
+  return {
+    id: row.id,
+    sectorName: row.sector_name,
+    summaryDate: row.summary_date,
+    turnover: optionalNumber(row.turnover),
+    volume: optionalNumber(row.volume),
+    marketCapLabel: row.market_cap_label ?? undefined,
+    changePercent: optionalNumber(row.change_percent),
+    companiesCount: row.companies_count ?? undefined,
+    sourceLabel: row.source_label ?? 'Sample data',
+  };
+}
+
+export function mapCompanyFactorSnapshotFromDb(row: CompanyFactorSnapshotDbRow): CompanyFactorSnapshot {
+  return {
+    id: row.id,
+    companySymbol: row.company_symbol,
+    snapshotDate: row.snapshot_date,
+    revenueTrend: row.revenue_trend ?? undefined,
+    profitTrend: row.profit_trend ?? undefined,
+    dividendStatus: row.dividend_status ?? undefined,
+    priceHistoryNote: row.price_history_note ?? undefined,
+    announcementNote: row.announcement_note ?? undefined,
+    liquidityNote: row.liquidity_note ?? undefined,
+    strengths: row.strengths ?? [],
+    concerns: row.concerns ?? [],
+    dataGaps: row.data_gaps ?? [],
+    sourceLabel: row.source_label ?? 'Sample data',
   };
 }

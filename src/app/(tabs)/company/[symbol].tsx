@@ -2,6 +2,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { BarChartCard } from '@/components/charts/BarChartCard';
+import { ChartRangeSelector } from '@/components/charts/ChartRangeSelector';
+import { LineChartCard } from '@/components/charts/LineChartCard';
 import { AppScreen } from '@/components/layout/AppScreen';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AppCard } from '@/components/ui/AppCard';
@@ -10,23 +13,29 @@ import { DisclaimerStrip } from '@/components/ui/DisclaimerStrip';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { InfoBox } from '@/components/ui/InfoBox';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { Pill } from '@/components/ui/Pill';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { StatCard } from '@/components/ui/StatCard';
 import { companies } from '@/data/companies';
+import { companyDividendHistory, companyFactorSnapshots, companyFinancialHistory, companyPriceHistory } from '@/data/history';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useAuth } from '@/hooks/useAuth';
 import { colors, spacing, typography } from '@/lib/constants';
 import { routes } from '@/lib/routes';
+import {
+  getCompanyDividendHistory,
+  getCompanyFactorSnapshot,
+  getCompanyFinancialHistory,
+  getCompanyPriceHistory,
+} from '@/services/marketDataService';
 import { getCompanyAnnouncements, getCompanyBySymbol } from '@/services/sharepathData';
 import {
   addCompanyToWatchlist,
   isCompanyInWatchlist,
   removeCompanyFromWatchlist,
 } from '@/services/userDataService';
+import type { ChartRange } from '@/types/history';
 
-const periods = ['1 month', '6 months', '1 year', '5 years'];
 const checklist = [
   'Has revenue grown over time?',
   'Has profit been stable?',
@@ -40,7 +49,7 @@ export default function CompanyDetailsScreen() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const { symbol } = useLocalSearchParams<{ symbol: string }>();
-  const [period, setPeriod] = useState(periods[2]);
+  const [chartRange, setChartRange] = useState<ChartRange>('1Y');
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [isSavingWatchlist, setIsSavingWatchlist] = useState(false);
   const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
@@ -56,7 +65,41 @@ export default function CompanyDetailsScreen() {
     [],
     [routeSymbol]
   );
+  const priceHistoryState = useAsyncData(
+    () => getCompanyPriceHistory(routeSymbol, chartRange),
+    companyPriceHistory.filter((item) => item.companySymbol === routeSymbol),
+    [routeSymbol, chartRange]
+  );
+  const financialHistoryState = useAsyncData(
+    () => getCompanyFinancialHistory(routeSymbol),
+    companyFinancialHistory.filter((item) => item.companySymbol === routeSymbol),
+    [routeSymbol]
+  );
+  const dividendHistoryState = useAsyncData(
+    () => getCompanyDividendHistory(routeSymbol),
+    companyDividendHistory.filter((item) => item.companySymbol === routeSymbol),
+    [routeSymbol]
+  );
+  const factorSnapshotState = useAsyncData(
+    () => getCompanyFactorSnapshot(routeSymbol),
+    companyFactorSnapshots.find((item) => item.companySymbol === routeSymbol) ?? {
+      companySymbol: routeSymbol,
+      snapshotDate: '2026-08-14',
+      strengths: [],
+      concerns: [],
+      dataGaps: [
+        'Not enough structured data is available yet. Review official reports and announcements before making any decision.',
+      ],
+      sourceLabel: 'Sample data',
+    },
+    [routeSymbol]
+  );
   const company = companyState.data;
+  const historySource =
+    priceHistoryState.data[0]?.sourceLabel ??
+    financialHistoryState.data[0]?.sourceLabel ??
+    dividendHistoryState.data[0]?.sourceLabel ??
+    'Sample data';
 
   useEffect(() => {
     let isMounted = true;
@@ -143,14 +186,17 @@ export default function CompanyDetailsScreen() {
       </View>
 
       <SectionHeader title="Historical Summary" subtitle={company.summary} />
-      <View style={styles.chips}>
-        {periods.map((item) => (
-          <Pill key={item} label={item} active={period === item} onPress={() => setPeriod(item)} />
-        ))}
-      </View>
-      <InfoBox>
-        {period} view: this placeholder will summarize past price and company context when verified historical data is connected.
-      </InfoBox>
+      <ChartRangeSelector value={chartRange} onChange={setChartRange} />
+      <LineChartCard
+        title="Share Price History"
+        subtitle="Historical closing prices. Past performance does not predict future results."
+        data={priceHistoryState.data.map((item) => ({
+          label: item.tradeDate.slice(5),
+          value: item.closePrice,
+        }))}
+        sourceLabel={priceHistoryState.data[0]?.sourceLabel ?? historySource}
+        isLoading={priceHistoryState.isLoading}
+      />
 
       <SectionHeader title="Financial History" />
       <View style={styles.grid}>
@@ -159,12 +205,74 @@ export default function CompanyDetailsScreen() {
         <StatCard label="EPS" value={company.financials.eps} />
         <StatCard label="NAV per share" value={company.financials.navPerShare} />
       </View>
+      <BarChartCard
+        title="Revenue and Profit History"
+        subtitle="LKR billions in sample structured history."
+        data={financialHistoryState.data.flatMap((item) => [
+          {
+            label: `${item.financialYear} Rev`,
+            value: item.revenue ?? 0,
+            frontColor: colors.primarySoft,
+          },
+          {
+            label: `${item.financialYear} PAT`,
+            value: item.profitAfterTax ?? 0,
+            frontColor: colors.accent,
+          },
+        ])}
+        sourceLabel={financialHistoryState.data[0]?.sourceLabel ?? historySource}
+        isLoading={financialHistoryState.isLoading}
+      />
+      <LineChartCard
+        title="Per Share Metrics"
+        data={financialHistoryState.data.map((item) => ({
+          label: item.financialYear,
+          value: item.eps ?? 0,
+        }))}
+        sourceLabel={financialHistoryState.data[0]?.sourceLabel ?? historySource}
+        subtitle="EPS history. NAV per share remains available in quick facts and structured data."
+        isLoading={financialHistoryState.isLoading}
+      />
 
       <SectionHeader title="Dividend History" />
+      <BarChartCard
+        title="Dividend History"
+        subtitle="Past dividends do not guarantee future dividends."
+        data={dividendHistoryState.data.map((item) => ({
+          label: item.dividendYear,
+          value: item.dividendPerShare ?? 0,
+          frontColor: colors.gold,
+        }))}
+        sourceLabel={dividendHistoryState.data[0]?.sourceLabel ?? historySource}
+        isLoading={dividendHistoryState.isLoading}
+      />
+      <InfoBox>{company.dividendNote}</InfoBox>
+
+      <SectionHeader title="Investment Factors Review" />
       <AppCard>
-        <Text style={styles.body}>Last dividend: placeholder from static data.</Text>
-        <Text style={styles.body}>{company.dividendNote}</Text>
-        <Text style={styles.safeNote}>Past dividends do not guarantee future dividends.</Text>
+        <Text style={styles.body}>{factorSnapshotState.data.revenueTrend ?? 'Revenue trend data unavailable.'}</Text>
+        <Text style={styles.body}>{factorSnapshotState.data.profitTrend ?? 'Profit trend data unavailable.'}</Text>
+        <Text style={styles.body}>{factorSnapshotState.data.dividendStatus ?? 'Dividend status data unavailable.'}</Text>
+        <Text style={styles.factorTitle}>Historical strengths</Text>
+        {factorSnapshotState.data.strengths.length > 0 ? (
+          factorSnapshotState.data.strengths.map((item) => <Text key={item} style={styles.checkItem}>- {item}</Text>)
+        ) : (
+          <Text style={styles.safeNote}>Data unavailable.</Text>
+        )}
+        <Text style={styles.factorTitle}>Possible concerns</Text>
+        {factorSnapshotState.data.concerns.length > 0 ? (
+          factorSnapshotState.data.concerns.map((item) => <Text key={item} style={styles.checkItem}>- {item}</Text>)
+        ) : (
+          <Text style={styles.safeNote}>Data unavailable.</Text>
+        )}
+        <Text style={styles.factorTitle}>Data gaps</Text>
+        {factorSnapshotState.data.dataGaps.length > 0 ? (
+          factorSnapshotState.data.dataGaps.map((item) => <Text key={item} style={styles.checkItem}>- {item}</Text>)
+        ) : (
+          <Text style={styles.safeNote}>No additional data gaps listed.</Text>
+        )}
+        <Text style={styles.source}>Source: {factorSnapshotState.data.sourceLabel}</Text>
+        <Text style={styles.safeNote}>This review is educational only and does not provide financial advice.</Text>
       </AppCard>
 
       <SectionHeader title="Latest Announcements" />
@@ -217,6 +325,17 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontFamily: typography.semiBold,
     fontSize: 15,
+  },
+  factorTitle: {
+    color: colors.text,
+    fontFamily: typography.bold,
+    fontSize: 14,
+    marginTop: spacing.xs,
+  },
+  source: {
+    color: colors.muted,
+    fontFamily: typography.medium,
+    fontSize: 11,
   },
   checkItem: {
     color: colors.text,
