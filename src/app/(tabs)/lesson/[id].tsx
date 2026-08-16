@@ -16,6 +16,7 @@ import { useAsyncData } from '@/hooks/useAsyncData';
 import { useAuth } from '@/hooks/useAuth';
 import { colors, typography } from '@/lib/constants';
 import { routes } from '@/lib/routes';
+import { getUserLessonProgress, markLessonCompleted, markLessonViewed } from '@/services/learningService';
 import { getLessonById } from '@/services/sharepathData';
 import { isLessonSaved, removeSavedLesson, saveLesson } from '@/services/userDataService';
 
@@ -26,6 +27,8 @@ export default function LessonDetailsScreen() {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
   const routeId = typeof id === 'string' ? id : '';
   const lessonState = useAsyncData(
     () => getLessonById(routeId),
@@ -57,6 +60,18 @@ export default function LessonDetailsScreen() {
     };
   }, [routeId, user]);
 
+  useEffect(() => {
+    if (!user || !routeId) {
+      Promise.resolve().then(() => setIsCompleted(false));
+      return;
+    }
+
+    void markLessonViewed(user.id, routeId);
+    getUserLessonProgress(user.id).then((result) => {
+      setIsCompleted(Boolean(result.data.find((item) => item.lessonId === routeId)?.completedAt));
+    });
+  }, [routeId, user]);
+
   async function toggleSavedLesson() {
     setSaveMessage(null);
 
@@ -77,6 +92,25 @@ export default function LessonDetailsScreen() {
     }
 
     setIsSaving(false);
+  }
+
+  async function completeLesson() {
+    setProgressMessage(null);
+
+    if (!isAuthenticated || !user) {
+      setProgressMessage('Sign in to track lesson progress.');
+      router.push(routes.login);
+      return;
+    }
+
+    const result = await markLessonCompleted(user.id, routeId);
+    if (result.errorMessage) {
+      setProgressMessage(result.errorMessage);
+      return;
+    }
+
+    setIsCompleted(true);
+    setProgressMessage('Completed. Saved lessons remain separate bookmarks.');
   }
 
   if (!lesson) {
@@ -101,7 +135,12 @@ export default function LessonDetailsScreen() {
       <PrimaryButton onPress={toggleSavedLesson} disabled={isSaving}>
         {isSaving ? (isSaved ? 'Removing...' : 'Saving...') : isSaved ? 'Remove Saved Lesson' : 'Save Lesson'}
       </PrimaryButton>
+      <PrimaryButton variant="secondary" onPress={completeLesson} disabled={isCompleted}>
+        {isCompleted ? 'Completed' : 'Mark as Complete'}
+      </PrimaryButton>
       {saveMessage ? <InfoBox tone="amber">{saveMessage}</InfoBox> : null}
+      {progressMessage ? <InfoBox tone="green">{progressMessage}</InfoBox> : null}
+      <InfoBox>Saved Lesson means bookmark. Completed Lesson means learning progress.</InfoBox>
       {lessonState.isLoading ? <LoadingState message="Loading lesson details..." /> : null}
       {!lessonState.isLoading && lessonState.isFallback ? <InfoBox>Showing sample data for now.</InfoBox> : null}
 

@@ -61,6 +61,8 @@ export default function TabsLayout() {
       />
       <Tabs.Screen name="company/[symbol]" options={{ href: null }} />
       <Tabs.Screen name="lesson/[id]" options={{ href: null }} />
+      <Tabs.Screen name="glossary" options={{ href: null }} />
+      <Tabs.Screen name="compare" options={{ href: null }} />
       <Tabs.Screen name="account" options={{ href: null }} />
     </Tabs>
   );

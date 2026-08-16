@@ -1,15 +1,19 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { TermTooltip } from '@/components/education/TermTooltip';
 import { LessonCard } from '@/components/cards/LessonCard';
 import { AppScreen } from '@/components/layout/AppScreen';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AppCard } from '@/components/ui/AppCard';
 import { InfoBox } from '@/components/ui/InfoBox';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { lessonCategories, lessons } from '@/data/lessons';
 import { useAsyncData } from '@/hooks/useAsyncData';
+import { useAuth } from '@/hooks/useAuth';
 import { colors, radii, spacing, typography } from '@/lib/constants';
 import { routes } from '@/lib/routes';
+import { getUserLessonProgress } from '@/services/learningService';
 import { getLessons } from '@/services/sharepathData';
 
 const pathDescriptions: Record<string, string> = {
@@ -22,14 +26,39 @@ const pathDescriptions: Record<string, string> = {
 
 export default function LearnScreen() {
   const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
   const lessonsState = useAsyncData(getLessons, lessons, []);
+  const progressState = useAsyncData(
+    () => getUserLessonProgress(user?.id ?? '').then((result) => ({ data: result.data, isFallback: Boolean(result.errorMessage) })),
+    [],
+    [user?.id]
+  );
   const categories = lessonCategories.filter((category) =>
     lessonsState.data.some((lesson) => lesson.category === category)
   );
+  const completedCount = progressState.data.filter((item) => item.completedAt).length;
+  const viewedCount = progressState.data.length;
 
   return (
     <AppScreen bottomInset={88}>
       <PageHeader title="Learn" subtitle="Short guides for understanding investing, companies, and market context." />
+      <AppCard>
+        <Text style={styles.pathTitle}>Investment Glossary</Text>
+        <Text style={styles.pathDescription}>Understand common share market terms in simple language.</Text>
+        <View style={styles.tooltipRow}>
+          <TermTooltip term="EPS" />
+          <TermTooltip term="NAV" />
+          <TermTooltip term="ASPI" />
+        </View>
+        <PrimaryButton variant="secondary" onPress={() => router.push(routes.glossary)}>
+          Open Glossary
+        </PrimaryButton>
+      </AppCard>
+      <InfoBox>
+        {isAuthenticated
+          ? `${viewedCount} of ${lessonsState.data.length} lessons viewed. ${completedCount} completed.`
+          : 'Sign in to track viewed and completed lessons separately from saved lessons.'}
+      </InfoBox>
       {lessonsState.isLoading ? <InfoBox>Loading lessons...</InfoBox> : null}
       {!lessonsState.isLoading && lessonsState.isFallback ? <InfoBox>Showing sample data for now.</InfoBox> : null}
       {categories.map((category) => {
@@ -94,5 +123,10 @@ const styles = StyleSheet.create({
     fontFamily: typography.semiBold,
     fontSize: 12,
     textTransform: 'uppercase',
+  },
+  tooltipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
   },
 });

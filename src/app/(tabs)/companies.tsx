@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CompanyCard } from '@/components/cards/CompanyCard';
 import { FilterChip } from '@/components/filters/FilterChip';
@@ -11,6 +11,7 @@ import { AppScreen } from '@/components/layout/AppScreen';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { InfoBox } from '@/components/ui/InfoBox';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { companies } from '@/data/companies';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { colors, spacing, typography } from '@/lib/constants';
@@ -49,6 +50,9 @@ function marketCapRank(label: string) {
 export default function CompaniesScreen() {
   const router = useRouter();
   const [filters, setFilters] = useState<CompanyFilterState>(defaultFilters);
+  const [isCompareMode, setIsCompareMode] = useState(false);
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
+  const [compareMessage, setCompareMessage] = useState<string | null>(null);
   const companiesState = useAsyncData(getCompanies, companies, []);
   const sectorOptions = useMemo(
     () => [
@@ -103,6 +107,22 @@ export default function CompaniesScreen() {
   }, [companiesState.data, filters]);
   const hasActiveFilters = JSON.stringify(filters) !== JSON.stringify(defaultFilters);
 
+  function toggleCompareSelection(symbol: string) {
+    setCompareMessage(null);
+
+    if (selectedSymbols.includes(symbol)) {
+      setSelectedSymbols((current) => current.filter((item) => item !== symbol));
+      return;
+    }
+
+    if (selectedSymbols.length >= 3) {
+      setCompareMessage('You can compare up to 3 companies at a time.');
+      return;
+    }
+
+    setSelectedSymbols((current) => [...current, symbol]);
+  }
+
   return (
     <AppScreen bottomInset={88}>
       <PageHeader
@@ -110,6 +130,16 @@ export default function CompaniesScreen() {
         title="Companies"
         subtitle="Explore historical company snapshots with beginner-friendly wording."
       />
+      <View style={styles.actions}>
+        <PrimaryButton
+          variant={isCompareMode ? 'primary' : 'secondary'}
+          onPress={() => {
+            setIsCompareMode((current) => !current);
+            setCompareMessage(null);
+          }}>
+          {isCompareMode ? 'Exit Compare' : 'Compare'}
+        </PrimaryButton>
+      </View>
       <FilterSheet onClear={() => setFilters(defaultFilters)} showClear={hasActiveFilters}>
         <SearchInput
           value={filters.search}
@@ -143,14 +173,25 @@ export default function CompaniesScreen() {
       <InfoBox>Historical data only. Use this information to guide your own research.</InfoBox>
       {companiesState.isLoading ? <InfoBox>Loading companies...</InfoBox> : null}
       {!companiesState.isLoading && companiesState.isFallback ? <InfoBox>Showing sample data for now.</InfoBox> : null}
+      {compareMessage ? <InfoBox tone="amber">{compareMessage}</InfoBox> : null}
       <Text style={styles.resultCount}>{filtered.length} company snapshots</Text>
       {filtered.length > 0 ? (
         filtered.map((company) => (
-          <CompanyCard
-            key={company.symbol}
-            company={company}
-            onPress={() => router.push(routes.company(company.symbol))}
-          />
+          <View key={company.symbol} style={styles.companyWrap}>
+            {isCompareMode ? (
+              <Pressable
+                style={[styles.selectBadge, selectedSymbols.includes(company.symbol) && styles.selectedBadge]}
+                onPress={() => toggleCompareSelection(company.symbol)}>
+                <Text style={[styles.selectText, selectedSymbols.includes(company.symbol) && styles.selectedText]}>
+                  {selectedSymbols.includes(company.symbol) ? 'Selected' : 'Select'}
+                </Text>
+              </Pressable>
+            ) : null}
+            <CompanyCard
+              company={company}
+              onPress={() => (isCompareMode ? toggleCompareSelection(company.symbol) : router.push(routes.company(company.symbol)))}
+            />
+          </View>
         ))
       ) : (
         <EmptyState
@@ -162,11 +203,27 @@ export default function CompaniesScreen() {
           }}
         />
       )}
+      {isCompareMode && selectedSymbols.length >= 2 ? (
+        <View style={styles.compareBar}>
+          <Text style={styles.compareText}>Compare {selectedSymbols.length} companies</Text>
+          <View style={styles.compareActions}>
+            <PrimaryButton variant="secondary" onPress={() => setSelectedSymbols([])}>
+              Clear
+            </PrimaryButton>
+            <PrimaryButton onPress={() => router.push(routes.compare(selectedSymbols))}>
+              Compare
+            </PrimaryButton>
+          </View>
+        </View>
+      ) : null}
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  actions: {
+    alignSelf: 'flex-start',
+  },
   dropdowns: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -181,5 +238,48 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontFamily: typography.medium,
     fontSize: 13,
+  },
+  companyWrap: {
+    gap: spacing.xs,
+  },
+  selectBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  selectedBadge: {
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.primarySoft,
+  },
+  selectText: {
+    color: colors.muted,
+    fontFamily: typography.semiBold,
+    fontSize: 12,
+  },
+  selectedText: {
+    color: colors.primary,
+  },
+  compareBar: {
+    backgroundColor: colors.primary,
+    borderRadius: 18,
+    bottom: 88,
+    gap: spacing.sm,
+    left: spacing.md,
+    padding: spacing.md,
+    position: 'absolute',
+    right: spacing.md,
+  },
+  compareText: {
+    color: colors.textOnPrimary,
+    fontFamily: typography.bold,
+    fontSize: 15,
+  },
+  compareActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
 });

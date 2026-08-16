@@ -23,6 +23,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { advisoryDisclaimer, colors, radii, spacing, typography } from '@/lib/constants';
 import { routes } from '@/lib/routes';
 import { getCompanyPriceHistory, getMarketIndexHistory } from '@/services/marketDataService';
+import { getContinueLearningLesson } from '@/services/learningService';
 import {
   getCompanies,
   getCurrencyRates,
@@ -33,7 +34,7 @@ import {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { profile, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { user, profile, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const companiesState = useAsyncData(getCompanies, companies, []);
   const lessonsState = useAsyncData(getLessons, lessons, []);
   const marketState = useAsyncData(getLatestMarketSummary, marketSummary, []);
@@ -50,10 +51,16 @@ export default function HomeScreen() {
     companyPriceHistory.filter((item) => item.companySymbol === featuredCompany.symbol),
     [featuredCompany.symbol]
   );
-  const lesson = lessonsState.data[0] ?? lessons[0];
+  const continueLessonState = useAsyncData(
+    () => getContinueLearningLesson(user?.id),
+    { lesson: lessons[0], hasProgress: false },
+    [user?.id]
+  );
+  const lesson = continueLessonState.data.lesson ?? lessonsState.data[0] ?? lessons[0];
   const isLoading =
     companiesState.isLoading ||
     lessonsState.isLoading ||
+    continueLessonState.isLoading ||
     marketState.isLoading ||
     aspiHistoryState.isLoading ||
     featuredPriceState.isLoading ||
@@ -62,6 +69,7 @@ export default function HomeScreen() {
   const isFallback =
     companiesState.isFallback ||
     lessonsState.isFallback ||
+    continueLessonState.isFallback ||
     marketState.isFallback ||
     aspiHistoryState.isFallback ||
     featuredPriceState.isFallback ||
@@ -121,7 +129,7 @@ export default function HomeScreen() {
       <SectionHeader title="Continue Learning" />
       <LessonCard lesson={lesson} onPress={() => router.push(routes.lesson(lesson.id))} />
       <PrimaryButton variant="secondary" onPress={() => router.push(routes.lesson(lesson.id))}>
-        Continue
+        {continueLessonState.data.hasProgress ? 'Continue Learning' : 'Start Learning'}
       </PrimaryButton>
 
       <SectionHeader title="Company to Understand" />

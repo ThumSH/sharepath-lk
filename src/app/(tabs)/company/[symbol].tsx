@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { BarChartCard } from '@/components/charts/BarChartCard';
 import { ChartRangeSelector } from '@/components/charts/ChartRangeSelector';
 import { LineChartCard } from '@/components/charts/LineChartCard';
+import { TermTooltip } from '@/components/education/TermTooltip';
 import { AppScreen } from '@/components/layout/AppScreen';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AppCard } from '@/components/ui/AppCard';
@@ -15,6 +16,7 @@ import { InfoBox } from '@/components/ui/InfoBox';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { SourceBadge } from '@/components/ui/SourceBadge';
 import { StatCard } from '@/components/ui/StatCard';
 import { companies } from '@/data/companies';
 import { companyDividendHistory, companyFactorSnapshots, companyFinancialHistory, companyPriceHistory } from '@/data/history';
@@ -177,6 +179,11 @@ export default function CompanyDetailsScreen() {
       {!companyState.isLoading && companyState.isFallback ? <InfoBox>Showing sample data for now.</InfoBox> : null}
 
       <SectionHeader title="Quick Facts" />
+      <View style={styles.chips}>
+        <TermTooltip term="52-week high" />
+        <TermTooltip term="52-week low" />
+        <TermTooltip term="Market Capitalization" />
+      </View>
       <View style={styles.grid}>
         <StatCard label="Current price" value={`LKR ${company.currentPrice.toFixed(2)}`} />
         <StatCard label="52-week high" value={`LKR ${company.fiftyTwoWeekHigh.toFixed(2)}`} />
@@ -199,6 +206,12 @@ export default function CompanyDetailsScreen() {
       />
 
       <SectionHeader title="Financial History" />
+      <View style={styles.chips}>
+        <TermTooltip term="Revenue" />
+        <TermTooltip term="PAT" />
+        <TermTooltip term="EPS" />
+        <TermTooltip term="NAV" />
+      </View>
       <View style={styles.grid}>
         <StatCard label="Revenue" value={company.financials.revenue} />
         <StatCard label="Profit after tax" value={company.financials.profitAfterTax} />
@@ -235,6 +248,7 @@ export default function CompanyDetailsScreen() {
       />
 
       <SectionHeader title="Dividend History" />
+      <TermTooltip term="Dividend" />
       <BarChartCard
         title="Dividend History"
         subtitle="Past dividends do not guarantee future dividends."
@@ -250,6 +264,10 @@ export default function CompanyDetailsScreen() {
 
       <SectionHeader title="Investment Factors Review" />
       <AppCard>
+        <View style={styles.chips}>
+          <TermTooltip term="Corporate Disclosure" />
+          <TermTooltip term="Turnover" />
+        </View>
         <Text style={styles.body}>{factorSnapshotState.data.revenueTrend ?? 'Revenue trend data unavailable.'}</Text>
         <Text style={styles.body}>{factorSnapshotState.data.profitTrend ?? 'Profit trend data unavailable.'}</Text>
         <Text style={styles.body}>{factorSnapshotState.data.dividendStatus ?? 'Dividend status data unavailable.'}</Text>
@@ -271,7 +289,7 @@ export default function CompanyDetailsScreen() {
         ) : (
           <Text style={styles.safeNote}>No additional data gaps listed.</Text>
         )}
-        <Text style={styles.source}>Source: {factorSnapshotState.data.sourceLabel}</Text>
+        <SourceBadge label={factorSnapshotState.data.sourceLabel} />
         <Text style={styles.safeNote}>This review is educational only and does not provide financial advice.</Text>
       </AppCard>
 
@@ -331,11 +349,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.bold,
     fontSize: 14,
     marginTop: spacing.xs,
-  },
-  source: {
-    color: colors.muted,
-    fontFamily: typography.medium,
-    fontSize: 11,
   },
   checkItem: {
     color: colors.text,

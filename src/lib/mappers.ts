@@ -28,6 +28,9 @@ import type {
   SectorSummary,
   SectorSummaryDbRow,
 } from '@/types/history';
+import type { GlossaryTerm, GlossaryTermDbRow } from '@/types/glossary';
+import type { TopMover, TopMoverDbRow } from '@/types/movers';
+import type { LessonProgress, LessonProgressDbRow } from '@/types/progress';
 
 function toNumber(value: number | string | null | undefined) {
   if (typeof value === 'number') {
@@ -218,6 +221,43 @@ export function mapCompanyFactorSnapshotFromDb(row: CompanyFactorSnapshotDbRow):
     strengths: row.strengths ?? [],
     concerns: row.concerns ?? [],
     dataGaps: row.data_gaps ?? [],
+    sourceLabel: row.source_label ?? 'Sample data',
+  };
+}
+
+export function mapGlossaryTermFromDb(row: GlossaryTermDbRow): GlossaryTerm {
+  return {
+    id: row.id,
+    term: row.term,
+    shortDefinition: row.short_definition,
+    detailedDefinition: row.detailed_definition,
+    category: row.category,
+    relatedLessonId: row.related_lesson_id,
+    sortOrder: row.sort_order ?? 0,
+    sourceLabel: row.source_label ?? 'Educational content',
+  };
+}
+
+export function mapLessonProgressFromDb(row: LessonProgressDbRow): LessonProgress {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    lessonId: row.lesson_id,
+    lastViewedAt: row.last_viewed_at,
+    completedAt: row.completed_at,
+  };
+}
+
+export function mapTopMoverFromDb(row: TopMoverDbRow): TopMover {
+  return {
+    id: row.id,
+    moverDate: row.mover_date,
+    companySymbol: row.company_symbol,
+    companyName: row.company_name,
+    movementType: row.movement_type,
+    changePercent: optionalNumber(row.change_percent) ?? null,
+    tradedVolume: optionalNumber(row.traded_volume) ?? null,
+    turnover: optionalNumber(row.turnover) ?? null,
     sourceLabel: row.source_label ?? 'Sample data',
   };
 }

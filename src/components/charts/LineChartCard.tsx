@@ -4,7 +4,8 @@ import { LineChart } from 'react-native-gifted-charts';
 import { EmptyChartState } from '@/components/charts/EmptyChartState';
 import { AppCard } from '@/components/ui/AppCard';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { colors, spacing, typography } from '@/lib/constants';
+import { SourceBadge } from '@/components/ui/SourceBadge';
+import { colors, typography } from '@/lib/constants';
 
 type LineChartPoint = {
   label: string;
@@ -52,7 +53,7 @@ export function LineChartCard({ title, subtitle, data, sourceLabel, isLoading = 
           />
         </ScrollView>
       ) : null}
-      {sourceLabel ? <Text style={styles.source}>Source: {sourceLabel}</Text> : null}
+      {sourceLabel ? <SourceBadge label={sourceLabel} /> : null}
     </AppCard>
   );
 }
@@ -73,11 +74,5 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontFamily: typography.regular,
     fontSize: 10,
-  },
-  source: {
-    color: colors.muted,
-    fontFamily: typography.medium,
-    fontSize: 11,
-    marginTop: spacing.xs,
   },
 });

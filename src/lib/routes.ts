@@ -12,6 +12,8 @@ export const routes = {
   login: '/auth/login' as Href,
   register: '/auth/register' as Href,
   account: '/account' as Href,
+  glossary: '/glossary' as Href,
+  compare: (symbols: string[]) => ({ pathname: '/compare', params: { symbols: symbols.join(',') } }) as unknown as Href,
   company: (symbol: string) => ({ pathname: '/company/[symbol]', params: { symbol } }) as unknown as Href,
   lesson: (id: string) => ({ pathname: '/lesson/[id]', params: { id } }) as unknown as Href,
 };

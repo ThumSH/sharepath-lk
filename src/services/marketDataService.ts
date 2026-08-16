@@ -6,6 +6,7 @@ import {
   marketIndexHistory,
   sectorSummaries,
 } from '@/data/history';
+import { topMovers as fallbackTopMovers } from '@/data/movers';
 import {
   mapCompanyDividendHistoryFromDb,
   mapCompanyFactorSnapshotFromDb,
@@ -13,6 +14,7 @@ import {
   mapCompanyPriceHistoryFromDb,
   mapMarketIndexHistoryFromDb,
   mapSectorSummaryFromDb,
+  mapTopMoverFromDb,
 } from '@/lib/mappers';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { DataResult } from '@/services/sharepathData';
@@ -31,6 +33,7 @@ import type {
   SectorSummary,
   SectorSummaryDbRow,
 } from '@/types/history';
+import type { TopMover, TopMoverDbRow, TopMoverType } from '@/types/movers';
 
 function warnFallback(label: string, error?: unknown) {
   if (__DEV__) {
@@ -249,4 +252,33 @@ export async function getCompanyFactorSnapshot(symbol: string): Promise<DataResu
   } catch (error) {
     return withFallback('company factor snapshot', fallback, error);
   }
+}
+
+export async function getTopMovers(type?: TopMoverType): Promise<DataResult<TopMover[]>> {
+  const fallback = type ? fallbackTopMovers.filter((item) => item.movementType === type) : fallbackTopMovers;
+
+  if (!isSupabaseConfigured || !supabase) {
+    return withFallback('top movers', fallback);
+  }
+
+  try {
+    let query = supabase.from('top_movers').select('*').order('mover_date', { ascending: false });
+
+    if (type) {
+      query = query.eq('movement_type', type);
+    }
+
+    const { data, error } = await query.limit(type ? 5 : 15);
+    if (error || !data) {
+      return withFallback('top movers', fallback, error);
+    }
+
+    return { data: (data as TopMoverDbRow[]).map(mapTopMoverFromDb), isFallback: false };
+  } catch (error) {
+    return withFallback('top movers', fallback, error);
+  }
+}
+
+export async function getTodayTopMovers(): Promise<DataResult<TopMover[]>> {
+  return getTopMovers();
 }
